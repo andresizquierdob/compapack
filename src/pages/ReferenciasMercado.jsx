@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { obtenerReferenciasMercadoMock } from '../data/mock.js'
+import { supabase } from '../lib/supabase.js'
 
 function formatearMonto(monto) {
   return new Intl.NumberFormat('es-VE', {
@@ -37,6 +37,11 @@ function ReferenciasMercado() {
   const [formularioAbierto, setFormularioAbierto] = useState(false)
   const [referenciaEnEdicion, setReferenciaEnEdicion] = useState(null)
   const [formulario, setFormulario] = useState(FORMULARIO_VACIO)
+  const [guardandoFormulario, setGuardandoFormulario] = useState(false)
+  const [errorFormulario, setErrorFormulario] = useState(null)
+
+  const [eliminandoId, setEliminandoId] = useState(null)
+  const [mensajeAccion, setMensajeAccion] = useState(null)
 
   useEffect(() => {
     let cancelado = false
@@ -45,8 +50,14 @@ function ReferenciasMercado() {
       setCargando(true)
       setError(null)
       try {
-        const datos = await obtenerReferenciasMercadoMock()
-        if (!cancelado) setReferencias(datos)
+        const { data, error: errorSupabase } = await supabase
+          .from('referencias_mercado')
+          .select('*')
+          .order('cargo')
+
+        if (errorSupabase) throw errorSupabase
+
+        if (!cancelado) setReferencias(data)
       } catch {
         if (!cancelado) {
           setError('No se pudieron cargar las referencias de mercado. Intenta de nuevo.')
@@ -76,6 +87,7 @@ function ReferenciasMercado() {
   function abrirFormularioNuevo() {
     setReferenciaEnEdicion(null)
     setFormulario(FORMULARIO_VACIO)
+    setErrorFormulario(null)
     setFormularioAbierto(true)
   }
 
@@ -88,6 +100,7 @@ function ReferenciasMercado() {
       mediana_salarial: referencia.mediana_salarial,
       fecha_referencia: referencia.fecha_referencia,
     })
+    setErrorFormulario(null)
     setFormularioAbierto(true)
   }
 
@@ -95,14 +108,17 @@ function ReferenciasMercado() {
     setFormularioAbierto(false)
     setReferenciaEnEdicion(null)
     setFormulario(FORMULARIO_VACIO)
+    setErrorFormulario(null)
   }
 
   function manejarCambioFormulario(campo, valor) {
     setFormulario((actual) => ({ ...actual, [campo]: valor }))
   }
 
-  function manejarGuardarFormulario(evento) {
+  async function manejarGuardarFormulario(evento) {
     evento.preventDefault()
+    setErrorFormulario(null)
+    setGuardandoFormulario(true)
 
     const referenciaGuardada = {
       cargo: formulario.cargo.trim(),
@@ -113,28 +129,65 @@ function ReferenciasMercado() {
       fecha_referencia: formulario.fecha_referencia,
     }
 
-    if (referenciaEnEdicion) {
-      setReferencias((actuales) =>
-        actuales.map((referencia) =>
-          referencia.id === referenciaEnEdicion.id
-            ? { ...referencia, ...referenciaGuardada }
-            : referencia,
-        ),
-      )
-    } else {
-      const siguienteId = referencias.reduce((max, r) => Math.max(max, r.id), 0) + 1
-      setReferencias((actuales) => [...actuales, { id: siguienteId, ...referenciaGuardada }])
-    }
+    try {
+      if (referenciaEnEdicion) {
+        const { data, error: errorSupabase } = await supabase
+          .from('referencias_mercado')
+          .update(referenciaGuardada)
+          .eq('id', referenciaEnEdicion.id)
+          .select()
+          .single()
 
-    cerrarFormulario()
+        if (errorSupabase) throw errorSupabase
+
+        setReferencias((actuales) =>
+          actuales.map((referencia) => (referencia.id === data.id ? data : referencia)),
+        )
+      } else {
+        const { data, error: errorSupabase } = await supabase
+          .from('referencias_mercado')
+          .insert(referenciaGuardada)
+          .select()
+          .single()
+
+        if (errorSupabase) throw errorSupabase
+
+        setReferencias((actuales) => [...actuales, data])
+      }
+
+      cerrarFormulario()
+    } catch {
+      setErrorFormulario('No se pudo guardar la referencia. Intenta de nuevo.')
+    } finally {
+      setGuardandoFormulario(false)
+    }
   }
 
-  function manejarEliminar(referencia) {
+  async function manejarEliminar(referencia) {
     const confirmado = window.confirm(
       `Eliminar la referencia de "${referencia.cargo}" (${referencia.rubro})? Esta accion no se puede deshacer.`,
     )
     if (!confirmado) return
-    setReferencias((actuales) => actuales.filter((r) => r.id !== referencia.id))
+
+    setMensajeAccion(null)
+    setEliminandoId(referencia.id)
+    try {
+      const { error: errorSupabase } = await supabase
+        .from('referencias_mercado')
+        .delete()
+        .eq('id', referencia.id)
+
+      if (errorSupabase) throw errorSupabase
+
+      setReferencias((actuales) => actuales.filter((r) => r.id !== referencia.id))
+    } catch {
+      setMensajeAccion({
+        tipo: 'error',
+        texto: 'No se pudo eliminar la referencia. Intenta de nuevo.',
+      })
+    } finally {
+      setEliminandoId(null)
+    }
   }
 
   return (
@@ -180,6 +233,18 @@ function ReferenciasMercado() {
         </p>
       )}
 
+      {!cargando && !error && mensajeAccion && (
+        <p
+          className={
+            mensajeAccion.tipo === 'error'
+              ? 'mt-6 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'
+              : 'mt-6 rounded border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700'
+          }
+        >
+          {mensajeAccion.texto}
+        </p>
+      )}
+
       {!cargando && !error && (
         <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
           <table className="w-full text-left text-sm">
@@ -212,16 +277,18 @@ function ReferenciasMercado() {
                       <button
                         type="button"
                         onClick={() => abrirFormularioEdicion(referencia)}
-                        className="text-sm font-medium text-slate-700 hover:underline"
+                        disabled={eliminandoId === referencia.id}
+                        className="text-sm font-medium text-slate-700 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Editar
                       </button>
                       <button
                         type="button"
                         onClick={() => manejarEliminar(referencia)}
-                        className="text-sm font-medium text-red-700 hover:underline"
+                        disabled={eliminandoId === referencia.id}
+                        className="text-sm font-medium text-red-700 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        Eliminar
+                        {eliminandoId === referencia.id ? 'Eliminando...' : 'Eliminar'}
                       </button>
                     </div>
                   </td>
@@ -314,19 +381,27 @@ function ReferenciasMercado() {
                 />
               </div>
 
+              {errorFormulario && (
+                <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {errorFormulario}
+                </p>
+              )}
+
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={cerrarFormulario}
-                  className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
+                  disabled={guardandoFormulario}
+                  className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="rounded bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                  disabled={guardandoFormulario}
+                  className="rounded bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Guardar
+                  {guardandoFormulario ? 'Guardando...' : 'Guardar'}
                 </button>
               </div>
             </form>

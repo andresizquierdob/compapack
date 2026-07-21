@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { obtenerClientesMock, obtenerPropuestasMock } from '../data/mock.js'
+import { supabase } from '../lib/supabase.js'
+import { obtenerPropuestasMock } from '../data/mock.js'
 
 function formatearMonto(monto) {
   return new Intl.NumberFormat('es-VE', {
@@ -28,6 +29,8 @@ function Inicio() {
   const [clienteExpandidoId, setClienteExpandidoId] = useState(null)
   const [formularioAbierto, setFormularioAbierto] = useState(false)
   const [formulario, setFormulario] = useState(FORMULARIO_VACIO)
+  const [guardandoCliente, setGuardandoCliente] = useState(false)
+  const [errorFormulario, setErrorFormulario] = useState(null)
 
   useEffect(() => {
     let cancelado = false
@@ -36,12 +39,15 @@ function Inicio() {
       setCargando(true)
       setError(null)
       try {
-        const [datosClientes, datosPropuestas] = await Promise.all([
-          obtenerClientesMock(),
+        const [resultadoClientes, datosPropuestas] = await Promise.all([
+          supabase.from('clientes').select('*').order('nombre_empresa'),
           obtenerPropuestasMock(),
         ])
+
+        if (resultadoClientes.error) throw resultadoClientes.error
+
         if (!cancelado) {
-          setClientes(datosClientes)
+          setClientes(resultadoClientes.data)
           setPropuestas(datosPropuestas)
         }
       } catch {
@@ -81,20 +87,42 @@ function Inicio() {
     setFormulario((actual) => ({ ...actual, [campo]: valor }))
   }
 
-  function manejarAgregarCliente(evento) {
+  async function manejarAgregarCliente(evento) {
     evento.preventDefault()
-    const siguienteId = clientes.reduce((max, c) => Math.max(max, c.id), 0) + 1
-    setClientes((actuales) => [
-      ...actuales,
-      {
-        id: siguienteId,
-        nombre_empresa: formulario.nombre_empresa.trim(),
-        rubro: formulario.rubro.trim(),
-        ciudad: formulario.ciudad.trim() === '' ? null : formulario.ciudad.trim(),
-      },
-    ])
-    setFormulario(FORMULARIO_VACIO)
+    setErrorFormulario(null)
+    setGuardandoCliente(true)
+
+    const clienteNuevo = {
+      nombre_empresa: formulario.nombre_empresa.trim(),
+      rubro: formulario.rubro.trim(),
+      ciudad: formulario.ciudad.trim() === '' ? null : formulario.ciudad.trim(),
+    }
+
+    try {
+      const { data, error: errorSupabase } = await supabase
+        .from('clientes')
+        .insert(clienteNuevo)
+        .select()
+        .single()
+
+      if (errorSupabase) throw errorSupabase
+
+      setClientes((actuales) =>
+        [...actuales, data].sort((a, b) => a.nombre_empresa.localeCompare(b.nombre_empresa)),
+      )
+      setFormulario(FORMULARIO_VACIO)
+      setFormularioAbierto(false)
+    } catch {
+      setErrorFormulario('No se pudo guardar el cliente. Intenta de nuevo.')
+    } finally {
+      setGuardandoCliente(false)
+    }
+  }
+
+  function cerrarFormularioCliente() {
     setFormularioAbierto(false)
+    setFormulario(FORMULARIO_VACIO)
+    setErrorFormulario(null)
   }
 
   return (
@@ -109,7 +137,10 @@ function Inicio() {
         <div className="flex gap-3">
           <button
             type="button"
-            onClick={() => setFormularioAbierto(true)}
+            onClick={() => {
+              setErrorFormulario(null)
+              setFormularioAbierto(true)
+            }}
             className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
           >
             Agregar cliente
@@ -263,22 +294,27 @@ function Inicio() {
                 />
               </div>
 
+              {errorFormulario && (
+                <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {errorFormulario}
+                </p>
+              )}
+
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setFormularioAbierto(false)
-                    setFormulario(FORMULARIO_VACIO)
-                  }}
-                  className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
+                  onClick={cerrarFormularioCliente}
+                  disabled={guardandoCliente}
+                  className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="rounded bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                  disabled={guardandoCliente}
+                  className="rounded bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Guardar
+                  {guardandoCliente ? 'Guardando...' : 'Guardar'}
                 </button>
               </div>
             </form>

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
-import { obtenerReferenciasMercadoMock } from '../data/mock.js'
 
 const OPCIONES_COMPA_RATIO = [0.8, 0.9, 1.0, 1.1, 1.2]
 
@@ -90,16 +89,17 @@ function NuevaPropuesta() {
       setCargando(true)
       setError(null)
       try {
-        const [resultadoClientes, datosReferencias] = await Promise.all([
+        const [resultadoClientes, resultadoReferencias] = await Promise.all([
           supabase.from('clientes').select('*').order('nombre_empresa'),
-          obtenerReferenciasMercadoMock(),
+          supabase.from('referencias_mercado').select('*').order('cargo'),
         ])
 
         if (resultadoClientes.error) throw resultadoClientes.error
+        if (resultadoReferencias.error) throw resultadoReferencias.error
 
         if (!cancelado) {
           setClientes(resultadoClientes.data)
-          setReferencias(datosReferencias)
+          setReferencias(resultadoReferencias.data)
         }
       } catch {
         if (!cancelado) {

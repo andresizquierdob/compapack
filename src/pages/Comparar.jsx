@@ -1,21 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { calcularPaquete } from '../lib/calculos.js'
-import { obtenerParametrosCalculoMock } from '../data/mock.js'
+import { supabase } from '../lib/supabase.js'
 
 const PORCENTAJES_POR_DEFECTO = [80, 90, 100, 110, 120]
 
+// Convierte el arreglo clave/valor de parametros_calculo (tal como esta en
+// Supabase) al objeto que espera calcularPaquete().
 const CLAVE_A_CAMPO = {
   dias_bono_vacacional: 'diasBonoVacacional',
   dias_utilidades: 'diasUtilidades',
-  cestaticket: 'cestaticket',
-  ivss_patronal: 'ivssPatronal',
-  rpe_patronal: 'rpePatronal',
-  faov_patronal: 'faovPatronal',
-  inces_patronal: 'incesPatronal',
-  ivss_trabajador: 'ivssTrabajador',
-  rpe_trabajador: 'rpeTrabajador',
-  faov_trabajador: 'faovTrabajador',
+  monto_cestaticket: 'cestaticket',
+  pct_ivss_patronal: 'ivssPatronal',
+  pct_rpe_patronal: 'rpePatronal',
+  pct_faov_patronal: 'faovPatronal',
+  pct_inces_patronal: 'incesPatronal',
+  pct_ivss_trabajador: 'ivssTrabajador',
+  pct_rpe_trabajador: 'rpeTrabajador',
+  pct_faov_trabajador: 'faovTrabajador',
 }
 
 function convertirParametros(listaParametros) {
@@ -67,10 +69,15 @@ function Comparar() {
       setCargando(true)
       setError(null)
       try {
-        const lista = await obtenerParametrosCalculoMock()
+        const { data, error: errorSupabase } = await supabase
+          .from('parametros_calculo')
+          .select('*')
+
+        if (errorSupabase) throw errorSupabase
+
         if (!cancelado) {
           const { parametros: parametrosConvertidos, tasa: tasaConvertida } =
-            convertirParametros(lista)
+            convertirParametros(data)
           setParametros(parametrosConvertidos)
           setTasa(tasaConvertida)
         }

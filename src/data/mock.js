@@ -132,3 +132,88 @@ export function obtenerReferenciasMercadoMock() {
     }, 300)
   })
 }
+
+// Espejo de la tabla propuestas. Los montos aqui son los que quedaron
+// congelados al momento de crear cada propuesta (no se recalculan con los
+// parametros actuales), igual que dice CLAUDE.md.
+export const propuestasMock = [
+  {
+    id: 1,
+    cliente_id: 1,
+    cargo: 'Gerente de Ventas',
+    rubro: 'Servicios Financieros',
+    ciudad: 'Caracas',
+    mediana_usada: 1800,
+    compa_ratio: 1.0,
+    salario_base: 1800,
+    costo_empresa_total: 2450.3,
+    neto_estimado: 1720.5,
+    tasa_usada: 38.2,
+    created_at: '2026-06-10T14:00:00Z',
+  },
+  {
+    id: 2,
+    cliente_id: 1,
+    cargo: 'Analista de Recursos Humanos',
+    rubro: 'Servicios Financieros',
+    ciudad: 'Caracas',
+    mediana_usada: 900,
+    compa_ratio: 0.9,
+    salario_base: 810,
+    costo_empresa_total: 1150.75,
+    neto_estimado: 775.4,
+    tasa_usada: 39.0,
+    created_at: '2026-07-01T10:30:00Z',
+  },
+  {
+    id: 3,
+    cliente_id: 2,
+    cargo: 'Desarrollador de Software',
+    rubro: 'Tecnologia',
+    ciudad: 'Valencia',
+    mediana_usada: 1300,
+    compa_ratio: 1.1,
+    salario_base: 1430,
+    costo_empresa_total: 1960.2,
+    neto_estimado: 1365.1,
+    tasa_usada: 40.5,
+    created_at: '2026-07-12T09:15:00Z',
+  },
+  {
+    id: 4,
+    cliente_id: 4,
+    cargo: 'Contador',
+    rubro: 'Manufactura',
+    ciudad: 'Caracas',
+    mediana_usada: 1100,
+    compa_ratio: 1.0,
+    salario_base: 1100,
+    costo_empresa_total: 1520.6,
+    neto_estimado: 1030.85,
+    tasa_usada: 40.5,
+    created_at: '2026-05-20T16:45:00Z',
+  },
+  {
+    id: 5,
+    cliente_id: 4,
+    cargo: 'Contador',
+    rubro: 'Manufactura',
+    ciudad: 'Caracas',
+    mediana_usada: 1100,
+    compa_ratio: 1.2,
+    salario_base: 1320,
+    costo_empresa_total: 1790.4,
+    neto_estimado: 1220.95,
+    tasa_usada: 41.0,
+    created_at: '2026-07-18T11:00:00Z',
+  },
+]
+
+// Simula la carga de propuestas desde Supabase.
+export function obtenerPropuestasMock() {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(propuestasMock.map((propuesta) => ({ ...propuesta })))
+    }, 300)
+  })
+}

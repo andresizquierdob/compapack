@@ -1,22 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { calcularPaquete } from '../lib/calculos.js'
-import { obtenerParametrosCalculoMock } from '../data/mock.js'
+import { supabase } from '../lib/supabase.js'
 
-// Convierte el arreglo clave/valor de parametros_calculo al objeto que espera
-// calcularPaquete(), y saca la tasa aparte porque calcularPaquete la recibe
-// como argumento independiente.
+// Convierte el arreglo clave/valor de parametros_calculo (tal como esta en
+// Supabase) al objeto que espera calcularPaquete(), y saca la tasa aparte
+// porque calcularPaquete la recibe como argumento independiente.
 const CLAVE_A_CAMPO = {
   dias_bono_vacacional: 'diasBonoVacacional',
   dias_utilidades: 'diasUtilidades',
-  cestaticket: 'cestaticket',
-  ivss_patronal: 'ivssPatronal',
-  rpe_patronal: 'rpePatronal',
-  faov_patronal: 'faovPatronal',
-  inces_patronal: 'incesPatronal',
-  ivss_trabajador: 'ivssTrabajador',
-  rpe_trabajador: 'rpeTrabajador',
-  faov_trabajador: 'faovTrabajador',
+  monto_cestaticket: 'cestaticket',
+  pct_ivss_patronal: 'ivssPatronal',
+  pct_rpe_patronal: 'rpePatronal',
+  pct_faov_patronal: 'faovPatronal',
+  pct_inces_patronal: 'incesPatronal',
+  pct_ivss_trabajador: 'ivssTrabajador',
+  pct_rpe_trabajador: 'rpeTrabajador',
+  pct_faov_trabajador: 'faovTrabajador',
 }
 
 function convertirParametros(listaParametros) {
@@ -84,10 +84,15 @@ function Resultados() {
       setCargando(true)
       setError(null)
       try {
-        const lista = await obtenerParametrosCalculoMock()
+        const { data, error: errorSupabase } = await supabase
+          .from('parametros_calculo')
+          .select('*')
+
+        if (errorSupabase) throw errorSupabase
+
         if (!cancelado) {
           const { parametros: parametrosConvertidos, tasa: tasaConvertida } =
-            convertirParametros(lista)
+            convertirParametros(data)
           setParametros(parametrosConvertidos)
           setTasa(tasaConvertida)
         }
@@ -158,13 +163,44 @@ function Resultados() {
     }
   }, [resultado, parametros, tasa])
 
-  function manejarGuardar() {
+  async function manejarGuardar() {
     setGuardando(true)
     setMensajeGuardado(null)
-    setTimeout(() => {
+
+    const propuestaNueva = {
+      cliente_id: propuesta.clienteId,
+      cargo: propuesta.cargo,
+      rubro: propuesta.rubro,
+      ciudad: propuesta.ciudad,
+      mediana_usada: propuesta.medianaMercado,
+      compa_ratio: propuesta.compaRatio,
+      salario_base: resultado.salarioBase.usd,
+      beneficios: propuesta.beneficiosAdicionales,
+      // Se congelan los parametros y la tasa tal como estaban al calcular:
+      // si mas adelante se editan en Configuracion, esta propuesta no cambia.
+      parametros_usados: parametros,
+      costo_empresa_total: resultado.costoEmpresaMensual.usd,
+      neto_estimado: resultado.netoTrabajadorMensual.usd,
+      tasa_usada: tasa,
+      notas: null,
+    }
+
+    try {
+      const { error: errorSupabase } = await supabase
+        .from('propuestas')
+        .insert(propuestaNueva)
+
+      if (errorSupabase) throw errorSupabase
+
+      setMensajeGuardado({ tipo: 'ok', texto: 'Propuesta guardada. Volviendo a Inicio...' })
+      setTimeout(() => navigate('/'), 900)
+    } catch {
+      setMensajeGuardado({
+        tipo: 'error',
+        texto: 'No se pudo guardar la propuesta. Intenta de nuevo.',
+      })
       setGuardando(false)
-      setMensajeGuardado('Propuesta guardada.')
-    }, 300)
+    }
   }
 
   function manejarComparar() {
@@ -352,7 +388,13 @@ function Resultados() {
           Comparar escenarios
         </button>
         {mensajeGuardado && (
-          <span className="text-sm text-green-700">{mensajeGuardado}</span>
+          <span
+            className={
+              mensajeGuardado.tipo === 'ok' ? 'text-sm text-green-700' : 'text-sm text-red-700'
+            }
+          >
+            {mensajeGuardado.texto}
+          </span>
         )}
       </div>
     </div>

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
-import { obtenerPropuestasMock } from '../data/mock.js'
 
 function formatearMonto(monto) {
   return new Intl.NumberFormat('es-VE', {
@@ -39,16 +38,17 @@ function Inicio() {
       setCargando(true)
       setError(null)
       try {
-        const [resultadoClientes, datosPropuestas] = await Promise.all([
+        const [resultadoClientes, resultadoPropuestas] = await Promise.all([
           supabase.from('clientes').select('*').order('nombre_empresa'),
-          obtenerPropuestasMock(),
+          supabase.from('propuestas').select('*').order('created_at', { ascending: false }),
         ])
 
         if (resultadoClientes.error) throw resultadoClientes.error
+        if (resultadoPropuestas.error) throw resultadoPropuestas.error
 
         if (!cancelado) {
           setClientes(resultadoClientes.data)
-          setPropuestas(datosPropuestas)
+          setPropuestas(resultadoPropuestas.data)
         }
       } catch {
         if (!cancelado) {

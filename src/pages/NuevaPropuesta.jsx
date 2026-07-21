@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  obtenerClientesMock,
-  obtenerReferenciasMercadoMock,
-} from '../data/mock.js'
+import { supabase } from '../lib/supabase.js'
+import { obtenerReferenciasMercadoMock } from '../data/mock.js'
 
 const OPCIONES_COMPA_RATIO = [0.8, 0.9, 1.0, 1.1, 1.2]
 
@@ -92,12 +90,15 @@ function NuevaPropuesta() {
       setCargando(true)
       setError(null)
       try {
-        const [datosClientes, datosReferencias] = await Promise.all([
-          obtenerClientesMock(),
+        const [resultadoClientes, datosReferencias] = await Promise.all([
+          supabase.from('clientes').select('*').order('nombre_empresa'),
           obtenerReferenciasMercadoMock(),
         ])
+
+        if (resultadoClientes.error) throw resultadoClientes.error
+
         if (!cancelado) {
-          setClientes(datosClientes)
+          setClientes(resultadoClientes.data)
           setReferencias(datosReferencias)
         }
       } catch {
@@ -161,7 +162,7 @@ function NuevaPropuesta() {
     evento.preventDefault()
     if (!formularioValido) return
 
-    const cliente = clientes.find((c) => c.id === Number(clienteId))
+    const cliente = clientes.find((c) => c.id === clienteId)
     const beneficiosAdicionales = BENEFICIOS_DISPONIBLES.filter(
       (beneficio) => beneficios[beneficio.clave].marcado,
     ).map((beneficio) => ({
@@ -171,7 +172,7 @@ function NuevaPropuesta() {
 
     navigate('/resultados', {
       state: {
-        clienteId: Number(clienteId),
+        clienteId,
         clienteNombre: cliente?.nombre_empresa ?? '',
         cargo,
         rubro,

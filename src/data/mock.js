@@ -93,3 +93,42 @@ export function obtenerParametrosCalculoMock() {
     }, 300)
   })
 }
+
+// Espejo de la tabla clientes.
+export const clientesMock = [
+  { id: 1, nombre_empresa: 'Inversiones Andina C.A.', rubro: 'Servicios Financieros', ciudad: 'Caracas' },
+  { id: 2, nombre_empresa: 'TecnoSoluciones VE', rubro: 'Tecnologia', ciudad: 'Valencia' },
+  { id: 3, nombre_empresa: 'Distribuidora El Puerto', rubro: 'Retail', ciudad: 'Maracaibo' },
+  { id: 4, nombre_empresa: 'Manufacturas del Centro', rubro: 'Manufactura', ciudad: 'Caracas' },
+]
+
+// Espejo de la tabla referencias_mercado. `ciudad: null` significa que la
+// referencia es nacional (no esta atada a una ciudad especifica).
+export const referenciasMercadoMock = [
+  { id: 1, cargo: 'Analista de Recursos Humanos', rubro: 'Servicios Financieros', ciudad: 'Caracas', mediana_salarial: 900, moneda: 'USD', fecha_referencia: '2026-06-01' },
+  { id: 2, cargo: 'Analista de Recursos Humanos', rubro: 'Tecnologia', ciudad: null, mediana_salarial: 950, moneda: 'USD', fecha_referencia: '2026-06-01' },
+  { id: 3, cargo: 'Gerente de Ventas', rubro: 'Retail', ciudad: 'Maracaibo', mediana_salarial: 1400, moneda: 'USD', fecha_referencia: '2026-06-01' },
+  { id: 4, cargo: 'Gerente de Ventas', rubro: 'Servicios Financieros', ciudad: 'Caracas', mediana_salarial: 1800, moneda: 'USD', fecha_referencia: '2026-06-01' },
+  { id: 5, cargo: 'Desarrollador de Software', rubro: 'Tecnologia', ciudad: 'Valencia', mediana_salarial: 1300, moneda: 'USD', fecha_referencia: '2026-06-01' },
+  { id: 6, cargo: 'Desarrollador de Software', rubro: 'Tecnologia', ciudad: null, mediana_salarial: 1250, moneda: 'USD', fecha_referencia: '2026-06-01' },
+  { id: 7, cargo: 'Contador', rubro: 'Manufactura', ciudad: 'Caracas', mediana_salarial: 1100, moneda: 'USD', fecha_referencia: '2026-06-01' },
+  { id: 8, cargo: 'Contador', rubro: 'Retail', ciudad: null, mediana_salarial: 1000, moneda: 'USD', fecha_referencia: '2026-06-01' },
+]
+
+// Simula la carga de clientes desde Supabase.
+export function obtenerClientesMock() {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(clientesMock.map((cliente) => ({ ...cliente })))
+    }, 300)
+  })
+}
+
+// Simula la carga de referencias de mercado desde Supabase.
+export function obtenerReferenciasMercadoMock() {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(referenciasMercadoMock.map((referencia) => ({ ...referencia })))
+    }, 300)
+  })
+}

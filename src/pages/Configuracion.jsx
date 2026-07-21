@@ -1,21 +1,22 @@
 import { useEffect, useState } from 'react'
-import { obtenerParametrosCalculoMock } from '../data/mock.js'
+import { supabase } from '../lib/supabase.js'
 
-// Como mostrar y editar cada parametro segun su clave. `unidad` controla el
-// texto que se ve junto al campo; `tipo` controla como se convierte el valor
-// entre lo que el usuario escribe y lo que se guarda internamente.
+// Como mostrar y editar cada parametro segun su clave (tal como esta en la
+// tabla parametros_calculo de Supabase). `unidad` controla el texto que se ve
+// junto al campo; `tipo` controla como se convierte el valor entre lo que el
+// usuario escribe y lo que se guarda internamente.
 const UNIDAD_POR_CLAVE = {
   tasa_bcv: { unidad: 'Bs/USD', tipo: 'monto' },
   dias_bono_vacacional: { unidad: 'dias', tipo: 'dias' },
   dias_utilidades: { unidad: 'dias', tipo: 'dias' },
-  cestaticket: { unidad: 'USD', tipo: 'monto' },
-  ivss_patronal: { unidad: '%', tipo: 'porcentaje' },
-  rpe_patronal: { unidad: '%', tipo: 'porcentaje' },
-  faov_patronal: { unidad: '%', tipo: 'porcentaje' },
-  inces_patronal: { unidad: '%', tipo: 'porcentaje' },
-  ivss_trabajador: { unidad: '%', tipo: 'porcentaje' },
-  rpe_trabajador: { unidad: '%', tipo: 'porcentaje' },
-  faov_trabajador: { unidad: '%', tipo: 'porcentaje' },
+  monto_cestaticket: { unidad: 'USD', tipo: 'monto' },
+  pct_ivss_patronal: { unidad: '%', tipo: 'porcentaje' },
+  pct_rpe_patronal: { unidad: '%', tipo: 'porcentaje' },
+  pct_faov_patronal: { unidad: '%', tipo: 'porcentaje' },
+  pct_inces_patronal: { unidad: '%', tipo: 'porcentaje' },
+  pct_ivss_trabajador: { unidad: '%', tipo: 'porcentaje' },
+  pct_rpe_trabajador: { unidad: '%', tipo: 'porcentaje' },
+  pct_faov_trabajador: { unidad: '%', tipo: 'porcentaje' },
 }
 
 // Convierte el valor guardado (fraccion decimal para porcentajes) al numero
@@ -52,9 +53,15 @@ function Configuracion() {
       setCargando(true)
       setError(null)
       try {
-        const datos = await obtenerParametrosCalculoMock()
+        const { data, error: errorSupabase } = await supabase
+          .from('parametros_calculo')
+          .select('*')
+          .order('clave')
+
+        if (errorSupabase) throw errorSupabase
+
         if (!cancelado) {
-          setParametros(datos)
+          setParametros(data)
         }
       } catch {
         if (!cancelado) {
@@ -90,12 +97,37 @@ function Configuracion() {
   }
 
   async function manejarGuardar() {
-    setGuardando(true)
     setMensajeGuardado(null)
+
+    const hayValoresInvalidos = parametros.some(
+      (parametro) => parametro.valor === '' || Number.isNaN(Number(parametro.valor)),
+    )
+    if (hayValoresInvalidos) {
+      setMensajeGuardado({
+        tipo: 'error',
+        texto: 'Revisa los valores: hay campos vacios o invalidos.',
+      })
+      return
+    }
+
+    setGuardando(true)
     try {
-      // Todavia no hay Supabase conectado: por ahora solo se simula el
-      // guardado. Cuando exista la tabla real, aqui se hara el update.
-      await new Promise((resolve) => setTimeout(resolve, 300))
+      const ahora = new Date().toISOString()
+      const resultados = await Promise.all(
+        parametros.map((parametro) =>
+          supabase
+            .from('parametros_calculo')
+            .update({ valor: Number(parametro.valor), actualizado_en: ahora })
+            .eq('id', parametro.id),
+        ),
+      )
+
+      const resultadoConError = resultados.find((resultado) => resultado.error)
+      if (resultadoConError) throw resultadoConError.error
+
+      setParametros((actuales) =>
+        actuales.map((parametro) => ({ ...parametro, actualizado_en: ahora })),
+      )
       setMensajeGuardado({ tipo: 'ok', texto: 'Cambios guardados.' })
     } catch {
       setMensajeGuardado({
